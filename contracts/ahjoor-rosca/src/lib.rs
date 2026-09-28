@@ -9731,12 +9731,31 @@ impl AhjoorContract {
         co_signers.get(member)
     }
 
-    /// Returns the freeze log (read-only, available even when frozen).
-    pub fn get_freeze_log(env: Env) -> Vec<FreezeRecord> {
-        env.storage()
+    /// Get a page of the freeze log (read-only, available even when frozen).
+    ///
+    /// Returns at most `limit` records starting at `offset`. An `offset` at or
+    /// past the end of the log (or a `limit` of `0`) yields an empty vector,
+    /// while a page that straddles the end returns only the remaining records.
+    pub fn get_freeze_log(env: Env, offset: u32, limit: u32) -> Vec<FreezeRecord> {
+        let log: Vec<FreezeRecord> = env
+            .storage()
             .persistent()
             .get(&PersistentKey::FreezeLog)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = log.len();
+        if limit == 0 || offset >= total {
+            return Vec::new(&env);
+        }
+
+        let end = offset.saturating_add(limit).min(total);
+        let mut page: Vec<FreezeRecord> = Vec::new(&env);
+        for i in offset..end {
+            if let Some(record) = log.get(i) {
+                page.push_back(record);
+            }
+        }
+        page
     }
     // =========================================================================
     // #243: On-Chain Group State Snapshot for Immutable Audit
