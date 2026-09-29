@@ -11445,6 +11445,9 @@ mod test_recurring_payment;
 mod test_subscription_v2;
 
 #[cfg(test)]
+mod test_cross_token_invoice;
+
+#[cfg(test)]
 mod test;
 
 #[cfg(test)]

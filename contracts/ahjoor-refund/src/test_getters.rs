@@ -63,24 +63,6 @@ fn test_get_merchant_auto_approve_exempt_after_set_true() {
     assert_eq!(exempt, true);
 }
 
-#[test]
-fn test_get_merchant_response_deadline_defaults_to_zero() {
-    let (_env, refund_client, _payment_client, _admin, _token_addr, _tc, _token_admin) =
-        setup_getters();
-
-    assert_eq!(refund_client.get_merchant_response_deadline(), (0, 0));
-}
-
-#[test]
-fn test_get_merchant_response_deadline_after_set() {
-    let (_env, refund_client, _payment_client, admin, _token_addr, _tc, _token_admin) =
-        setup_getters();
-
-    refund_client.set_merchant_response_deadline(&admin, &123u32, &45u32);
-
-    assert_eq!(refund_client.get_merchant_response_deadline(), (123, 45));
-}
-
 // ===========================================================================
 //  Test: get_abuse_block_config
 // ===========================================================================

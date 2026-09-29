@@ -6549,11 +6549,24 @@ impl AhjoorContract {
             .unwrap_or(Map::new(&env))
     }
 
-    pub fn get_approved_tokens(env: Env) -> Vec<Address> {
-        env.storage()
+    /// Returns the slice `[offset, offset + limit)` of approved tokens. An
+    /// out-of-range `offset` returns an empty vec rather than panicking.
+    pub fn get_approved_tokens(env: Env, offset: u32, limit: u32) -> Vec<Address> {
+        let tokens: Vec<Address> = env
+            .storage()
             .instance()
             .get(&DataKey::ApprovedTokens)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = tokens.len();
+        let start = offset.min(total);
+        let end = start.saturating_add(limit).min(total);
+
+        let mut page = Vec::new(&env);
+        for i in start..end {
+            page.push_back(tokens.get(i).unwrap());
+        }
+        page
     }
 
     pub fn get_proposal(env: Env, proposal_id: u32) -> Option<Proposal> {
@@ -7129,11 +7142,31 @@ impl AhjoorContract {
             .unwrap_or(Map::new(&env))
     }
 
-    pub fn get_exited_members(env: Env) -> Vec<Address> {
-        env.storage()
+    /// Get a page of the group's exited members.
+    ///
+    /// Returns at most `limit` members starting at `offset`. An `offset` at or
+    /// past the end of the list (or a `limit` of `0`) yields an empty vector,
+    /// while a page that straddles the end returns only the remaining entries.
+    pub fn get_exited_members(env: Env, offset: u32, limit: u32) -> Vec<Address> {
+        let exited_members: Vec<Address> = env
+            .storage()
             .instance()
             .get(&DataKey::ExitedMembers)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = exited_members.len();
+        if limit == 0 || offset >= total {
+            return Vec::new(&env);
+        }
+
+        let end = offset.saturating_add(limit).min(total);
+        let mut page: Vec<Address> = Vec::new(&env);
+        for i in offset..end {
+            if let Some(addr) = exited_members.get(i) {
+                page.push_back(addr);
+            }
+        }
+        page
     }
 
     // ── #792: Configurable voluntary exit notice period ───────────────────────
@@ -8204,6 +8237,14 @@ impl AhjoorContract {
         env.storage()
             .instance()
             .set(&DataKey2::ReinstatementFee, &fee);
+    }
+
+    /// Returns the configured reinstatement fee (0 if unset).
+    pub fn get_reinstatement_fee(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DataKey2::ReinstatementFee)
+            .unwrap_or(0)
     }
 
     pub fn request_reinstatement(env: Env, member: Address, reason_hash: BytesN<32>) -> u32 {
@@ -9757,12 +9798,31 @@ impl AhjoorContract {
         co_signers.get(member)
     }
 
-    /// Returns the freeze log (read-only, available even when frozen).
-    pub fn get_freeze_log(env: Env) -> Vec<FreezeRecord> {
-        env.storage()
+    /// Get a page of the freeze log (read-only, available even when frozen).
+    ///
+    /// Returns at most `limit` records starting at `offset`. An `offset` at or
+    /// past the end of the log (or a `limit` of `0`) yields an empty vector,
+    /// while a page that straddles the end returns only the remaining records.
+    pub fn get_freeze_log(env: Env, offset: u32, limit: u32) -> Vec<FreezeRecord> {
+        let log: Vec<FreezeRecord> = env
+            .storage()
             .persistent()
             .get(&PersistentKey::FreezeLog)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = log.len();
+        if limit == 0 || offset >= total {
+            return Vec::new(&env);
+        }
+
+        let end = offset.saturating_add(limit).min(total);
+        let mut page: Vec<FreezeRecord> = Vec::new(&env);
+        for i in offset..end {
+            if let Some(record) = log.get(i) {
+                page.push_back(record);
+            }
+        }
+        page
     }
     // =========================================================================
     // #243: On-Chain Group State Snapshot for Immutable Audit
@@ -10285,6 +10345,20 @@ impl AhjoorContract {
         env.storage()
             .instance()
             .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+    }
+
+    /// Returns the credit score weights, falling back to the defaults if unset.
+    pub fn get_score_weights(env: Env) -> ScoreWeights {
+        env.storage()
+            .instance()
+            .get(&DataKey3::ScoreWeights)
+            .unwrap_or(ScoreWeights {
+                on_time_weight: 10,
+                late_weight: -2,
+                default_weight: -20,
+                exit_weight: -15,
+                completion_weight: 30,
+            })
     }
 
     /// Admin sets the minimum credit score required to join this group.

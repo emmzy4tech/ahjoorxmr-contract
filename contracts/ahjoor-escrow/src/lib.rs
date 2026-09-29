@@ -10042,12 +10042,25 @@ impl AhjoorEscrowContract {
             .unwrap_or(true)
     }
 
-    /// #799: Return child escrow IDs linked to a parent.
-    pub fn get_child_escrows(env: Env, parent_escrow_id: u32) -> Vec<u32> {
-        env.storage()
+    /// #799: Return child escrow IDs linked to a parent, paginated as the
+    /// slice `[offset, offset + limit)`. An out-of-range `offset` returns an
+    /// empty vec rather than panicking.
+    pub fn get_child_escrows(env: Env, parent_escrow_id: u32, offset: u32, limit: u32) -> Vec<u32> {
+        let children: Vec<u32> = env
+            .storage()
             .persistent()
             .get(&DataKey3::ChildEscrows(parent_escrow_id))
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = children.len();
+        let start = offset.min(total);
+        let end = start.saturating_add(limit).min(total);
+
+        let mut page = Vec::new(&env);
+        for i in start..end {
+            page.push_back(children.get(i).unwrap());
+        }
+        page
     }
 
     /// #799: Aggregate project status derived from all linked child escrows.
@@ -10333,3 +10346,6 @@ mod test_multi_seller;
 
 #[cfg(test)]
 mod test_fee_sponsorship;
+
+#[cfg(test)]
+mod test_escrow_template;
