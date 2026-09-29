@@ -7116,11 +7116,31 @@ impl AhjoorContract {
             .unwrap_or(Map::new(&env))
     }
 
-    pub fn get_exited_members(env: Env) -> Vec<Address> {
-        env.storage()
+    /// Get a page of the group's exited members.
+    ///
+    /// Returns at most `limit` members starting at `offset`. An `offset` at or
+    /// past the end of the list (or a `limit` of `0`) yields an empty vector,
+    /// while a page that straddles the end returns only the remaining entries.
+    pub fn get_exited_members(env: Env, offset: u32, limit: u32) -> Vec<Address> {
+        let exited_members: Vec<Address> = env
+            .storage()
             .instance()
             .get(&DataKey::ExitedMembers)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = exited_members.len();
+        if limit == 0 || offset >= total {
+            return Vec::new(&env);
+        }
+
+        let end = offset.saturating_add(limit).min(total);
+        let mut page: Vec<Address> = Vec::new(&env);
+        for i in offset..end {
+            if let Some(addr) = exited_members.get(i) {
+                page.push_back(addr);
+            }
+        }
+        page
     }
 
     // ── #792: Configurable voluntary exit notice period ───────────────────────
