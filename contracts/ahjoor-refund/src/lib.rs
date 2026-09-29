@@ -1833,12 +1833,32 @@ impl AhjoorRefundContract {
             .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
     }
 
-    /// Get the auto-approval whitelist.
-    pub fn get_auto_approved_merchants(env: Env) -> Vec<Address> {
-        env.storage()
+    /// Get a page of the auto-approval whitelist.
+    ///
+    /// Returns at most `limit` merchants starting at `offset`. An `offset` at
+    /// or past the end of the list (or a `limit` of `0`) yields an empty
+    /// vector, while a page that straddles the end returns only the remaining
+    /// entries.
+    pub fn get_auto_approved_merchants(env: Env, offset: u32, limit: u32) -> Vec<Address> {
+        let whitelist: Vec<Address> = env
+            .storage()
             .persistent()
             .get(&DataKey::AutoApprovedMerchants)
-            .unwrap_or(Vec::new(&env))
+            .unwrap_or(Vec::new(&env));
+
+        let total = whitelist.len();
+        if limit == 0 || offset >= total {
+            return Vec::new(&env);
+        }
+
+        let end = offset.saturating_add(limit).min(total);
+        let mut page: Vec<Address> = Vec::new(&env);
+        for i in offset..end {
+            if let Some(addr) = whitelist.get(i) {
+                page.push_back(addr);
+            }
+        }
+        page
     }
 
     // -------------------------------------------------------------------------
